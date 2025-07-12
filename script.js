@@ -1,0 +1,23 @@
+const phrases = [
+    "Code today, conquer tomorrow.",
+    "Start where you are. Use what you have. Do what you can.",
+    "Every error is a step closer to mastery.",
+    "You don’t have to be great to start, but you have to start to be great.",
+    "Push through. The breakthrough is coming.",
+    "You’re not stuck — you’re learning.",
+    "Keep coding — future you will thank you.",
+    "Hard things are hard — until they’re not.",
+    "Discipline beats motivation. Show up anyway.",
+    "One line at a time. One step closer.",
+    "You’re building more than code — you’re building a future."
+];
+
+function getRandomPhrase() {
+    const randomIndex = Math.floor(Math.random() * phrases.length);
+    return phrases[randomIndex];
+};
+
+document.getElementById("message").addEventListener("click", function () {
+    const phrase = getRandomPhrase();
+    document.getElementById("output").textContent = phrase;
+});
