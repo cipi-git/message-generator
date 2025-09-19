@@ -1,43 +1,296 @@
+<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Message Generator</title>
-    <link rel="stylesheet" href="stylesheet.css">
-    
-</head>
-<body>
 
-    <h1>Read and enjoy!</h1>
-    <p id="output">Click and enjoy</p>
-    <div>
-        <button id="message">Press Me!</button>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Message Generator</title>
+    <meta name="theme-color" content="#1e3a8a" />
+    <link rel="stylesheet" href="stylesheet.css">
+</head>
+
+<body>
+    <div class="card">
+        <h1>💡 Random Motivation</h1>
+
+        <!-- Viewers choose a category, get a message, copy or save it -->
+        <div class="controls">
+            <label>
+                <span class="sr-only">Choose category</span>
+                <select id="category" aria-label="Choose category">
+                    <option value="all">All categories</option>
+                    <option value="coding">Coding</option>
+                    <option value="motivation">Motivation</option>
+                    <option value="life">Life</option>
+                </select>
+            </label>
+
+            <button id="message" type="button">✨ Inspire Me</button>
+            <button id="copy" type="button" title="Copy the current message">Copy</button>
+            <button id="save" type="button" title="Save the current message">Save</button>
+            <button id="dim-toggle" type="button" aria-pressed="false" title="Toggle background dim">Dim</button>
+        </div>
+
+        <!-- Viewers see messages here (announced to screen readers) -->
+        <p id="output" role="status" aria-live="polite">Choose a category (or leave All), then click “Inspire Me”.</p>
+        <p class="hint">Tip: switch categories — the background updates too.</p>
+
+        <!-- Viewers can open Favorites to reuse, copy, or remove saved lines -->
+        <details class="favs" id="favs-panel">
+            <summary>⭐ Favorites (<span id="fav-count">0</span>)</summary>
+            <div class="fav-actions">
+                <button id="copy-all" type="button" title="Copy all favorites">Copy all</button>
+                <button id="clear-all" type="button" class="danger" title="Remove all favorites">Clear all</button>
+            </div>
+            <ul id="favs"></ul>
+        </details>
     </div>
+
+    <!-- Tiny toast so viewers know copy/save worked -->
+    <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
     <script>
-        const phrases = [
-            "Code today, conquer tomorrow.",
-            "Start where you are. Use what you have. Do what you can.",
-            "Every error is a step closer to mastery.",
-            "You don’t have to be great to start, but you have to start to be great.",
-            "Push through. The breakthrough is coming.",
-            "You’re not stuck — you’re learning.",
-            "Keep coding — future you will thank you.",
-            "Hard things are hard — until they’re not.",
-            "Discipline beats motivation. Show up anyway.",
-            "One line at a time. One step closer.",
-            "You’re building more than code — you’re building a future."
+        // Viewer content: short, uplifting lines by category
+        const phrases = {
+            coding: [
+                "Code today, conquer tomorrow.",
+                "Every error is a step closer to mastery.",
+                "Keep coding — future you will thank you.",
+                "Hard things are hard — until they’re not.",
+                "Debugging is like being a detective in a crime movie where you are also the murderer.",
+                "Programs must be written for people to read, and only incidentally for machines to execute.",
+                "Clean code always looks like it was written by someone who cares.",
+                "Talk is cheap. Show me the code.",
+                "Simplicity is the soul of efficiency.",
+                "Make it work, make it right, make it fast.",
+                "Code never lies, comments sometimes do.",
+                "The best error message is the one that never shows up.",
+                "Before software can be reusable it first has to be usable.",
+                "Learning to code is learning to create and innovate.",
+                "First, solve the problem. Then, write the code.",
+                "Testing leads to failure, and failure leads to understanding."
+
+            ],
+            motivation: [
+                "You don’t have to be great to start, but you have to start to be great.",
+                "Push through. The breakthrough is coming.",
+                "Discipline beats motivation. Show up anyway.",
+                "One line at a time. One step closer.",
+                "Dream big, start small, act now.",
+                "Don’t stop until you’re proud.",
+                "You are capable of more than you know.",
+                "Consistency turns average into excellence.",
+                "The harder you work for something, the greater you’ll feel when you achieve it.",
+                "Success doesn’t come from what you do occasionally, but from what you do consistently.",
+                "Stay positive, work hard, make it happen.",
+                "Every accomplishment starts with the decision to try.",
+                "Progress, not perfection.",
+                "Push yourself, because no one else is going to do it for you.",
+                "Your only limit is your mind.",
+                "Don’t wish for it, work for it."
+
+            ],
+            life: [
+                "Start where you are. Use what you have. Do what you can.",
+                "You’re not stuck — you’re learning.",
+                "You’re building more than code — you’re building a future.",
+                "Small steps every day add up to big changes.",
+                "Enjoy the little things, for one day you’ll look back and realize they were the big things.",
+                "Happiness is not something ready made. It comes from your own actions.",
+                "Do something today that your future self will thank you for.",
+                "Life is 10% what happens to us and 90% how we react to it.",
+                "Don’t count the days, make the days count.",
+                "Turn your wounds into wisdom.",
+                "Be yourself; everyone else is already taken.",
+                "Time is free, but it’s priceless.",
+                "Life is about making an impact, not making an income.",
+                "Wherever you go, go with all your heart.",
+                "In the middle of every difficulty lies opportunity.",
+                "Act as if what you do makes a difference. It does."
+
+            ]
+        };
+
+        // Viewer ambiance: gentle gradients rotate on actions
+        const colors = [
+            "linear-gradient(135deg,#1e3a8a,#9333ea)",
+            "linear-gradient(135deg,#16a34a,#22d3ee)",
+            "linear-gradient(135deg,#dc2626,#f97316)",
+            "linear-gradient(135deg,#0ea5e9,#6366f1)"
         ];
 
-        function getRandomPhrase() {
-            const randomIndex = Math.floor(Math.random() * phrases.length);
-            return phrases[randomIndex];
+        const output = document.getElementById("output");
+        const btnInspire = document.getElementById("message");
+        const btnCopy = document.getElementById("copy");
+        const btnSave = document.getElementById("save");
+        const select = document.getElementById("category");
+        const dimBtn = document.getElementById("dim-toggle");
+
+        const favCount = document.getElementById("fav-count");
+        const favList = document.getElementById("favs");
+        const favsPanel = document.getElementById("favs-panel");
+        const btnCopyAll = document.getElementById("copy-all");
+        const btnClearAll = document.getElementById("clear-all");
+        const toast = document.getElementById("toast");
+
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        const getPool = cat => cat === "all" ? Object.values(phrases).flat() : (phrases[cat] ?? []);
+        const getText = () => (output.textContent || "").trim();
+        const LS_KEY = "mg-favorites";
+        const CAT_KEY = "mg-category";
+
+        function nextPhrase() {
+            const pool = getPool(select.value);
+            return pool.length ? pick(pool) : "No phrases available.";
+        }
+        function nextBg() { document.body.style.background = pick(colors); }
+
+        function show(text) {
+            output.classList.remove("show");
+            output.textContent = text;
+            requestAnimationFrame(() => { setTimeout(() => output.classList.add("show"), 30); });
         }
 
-        document.getElementById("message").addEventListener("click", function () {
-            const phrase = getRandomPhrase();
-            document.getElementById("output").textContent = phrase;
+        // Feedback so viewers know actions worked
+        function notify(msg) {
+            toast.textContent = msg;
+            toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 1200);
+        }
+
+        // Favorites: read/save/render
+        function readFavs() {
+            try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+            catch { return []; }
+        }
+        function writeFavs(list) { localStorage.setItem(LS_KEY, JSON.stringify(list)); }
+        function setFavCount(n) { favCount.textContent = n; }
+
+        function renderFavs() {
+            const items = readFavs();
+            setFavCount(items.length);
+            favList.innerHTML = "";
+            if (!items.length) return;
+
+            items.forEach((txt, idx) => {
+                const li = document.createElement("li");
+
+                const p = document.createElement("p");
+                p.className = "fav-text";
+                p.textContent = txt;
+
+                const row = document.createElement("div");
+                row.className = "fav-btns";
+
+                const bCopy = document.createElement("button");
+                bCopy.type = "button";
+                bCopy.textContent = "Copy";
+                bCopy.title = "Copy this favorite";
+                bCopy.addEventListener("click", () => copyText(txt));
+
+                const bUse = document.createElement("button");
+                bUse.type = "button";
+                bUse.textContent = "Use";
+                bUse.title = "Show this message";
+                bUse.addEventListener("click", () => show(txt));
+
+                const bDel = document.createElement("button");
+                bDel.type = "button";
+                bDel.textContent = "Remove";
+                bDel.className = "danger";
+                bDel.title = "Remove this favorite";
+                bDel.addEventListener("click", () => {
+                    const all = readFavs();
+                    all.splice(idx, 1);
+                    writeFavs(all);
+                    renderFavs();
+                    notify("Removed");
+                });
+
+                row.append(bCopy, bUse, bDel);
+                li.append(p, row);
+                favList.append(li);
+            });
+        }
+
+        function saveFavorite() {
+            const txt = getText();
+            if (!txt || txt.startsWith("Choose a category") || txt.startsWith("Category:")) {
+                notify("Nothing to save yet");
+                return;
+            }
+            const all = readFavs();
+            if (all.includes(txt)) { notify("Already saved"); return; }
+            all.push(txt);
+            writeFavs(all);
+            renderFavs();
+            // auto-open panel when first item is saved so viewers see it
+            favsPanel.open = true;
+            notify("Saved");
+        }
+
+        async function copyText(txt = getText()) {
+            if (!txt || txt.startsWith("Choose a category")) {
+                notify("Nothing to copy");
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(txt);
+                notify("Copied");
+            } catch {
+                // Fallback: select temp textarea
+                const ta = document.createElement("textarea");
+                ta.value = txt; document.body.appendChild(ta);
+                ta.select(); document.execCommand("copy"); ta.remove();
+                notify("Copied");
+            }
+        }
+
+        // Viewer actions
+        btnInspire.addEventListener("click", () => { show(nextPhrase()); nextBg(); });
+        btnCopy.addEventListener("click", () => copyText());
+        btnSave.addEventListener("click", saveFavorite);
+
+        select.addEventListener("change", () => {
+            const label = select.value === "all" ? "All" : (select.value[0].toUpperCase() + select.value.slice(1));
+            localStorage.setItem(CAT_KEY, select.value);
+            show("Category: " + label);
+            nextBg();
         });
+
+        // Viewers can dim/brighten background for comfort
+        dimBtn.addEventListener("click", () => {
+            document.body.classList.toggle("dim-strong");
+            const on = document.body.classList.contains("dim-strong");
+            dimBtn.setAttribute("aria-pressed", on);
+            dimBtn.textContent = on ? "Brighten" : "Dim";
+        });
+
+        // Bulk favorites actions
+        btnCopyAll.addEventListener("click", () => {
+            const all = readFavs();
+            if (!all.length) { notify("No favorites"); return; }
+            copyText(all.join("\n"));
+        });
+        btnClearAll.addEventListener("click", () => {
+            const all = readFavs();
+            if (!all.length) { notify("Nothing to clear"); return; }
+            if (confirm("Remove all favorites?")) {
+                writeFavs([]); renderFavs(); notify("Cleared");
+            }
+        });
+
+        // First paint: restore category and favorites
+        (function init() {
+            const savedCat = localStorage.getItem(CAT_KEY);
+            if (savedCat && [...select.options].some(o => o.value === savedCat)) {
+                select.value = savedCat;
+            }
+            show("Category: " + (select.value === "all" ? "All" : (select.value[0].toUpperCase() + select.value.slice(1))));
+            output.classList.add("show");
+            renderFavs();
+        })();
     </script>
-    
 </body>
+
 </html>
